@@ -1,2 +1,23 @@
 # LOGr
-Logr – Smart Attendance Tracking Made Simple  Logr is a sleek and efficient attendance tracker designed to simplify the way you manage presence and records. Logr – Just log it. Stay on track. 🚀
+
+## 🚀 Logr – Smart Attendance Tracker
+
+> Just log it. Stay on track.
+
+Logr is a modern, minimal, and efficient attendance tracking web application designed to simplify how you manage and monitor attendance. Built with a clean UI and smooth user experience, Logr helps students, teachers, and organizations stay organized effortlessly.
+
+---
+
+## ✨ Features
+
+- ✅ Quick & easy attendance marking  
+- 📊 Clean dashboard with insights  
+- ⏱️ Real-time tracking  
+- 🗂️ Organized data management  
+- 🌐 Accessible anytime, anywhere  
+- 🎯 Minimal & user-friendly interface  
+
+---
+
+
+
