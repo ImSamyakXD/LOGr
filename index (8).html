@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logr — Attendance Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root[data-theme="dark"] {
+    --bg:#0d0f14; --surface:#161820; --surface2:#1e2028; --border:#2a2d38;
+    --accent:#7c6af7; --accent2:#4ecdc4; --danger:#ff6b6b;
+    --present:#4ecdc4; --absent:#2a2d38; --text:#e8eaf0; --muted:#6b7080;
+    --grid:rgba(124,106,247,0.04); --hbg:rgba(13,15,20,0.88); --shadow:0 8px 28px rgba(0,0,0,0.4);
+  }
+  :root[data-theme="light"] {
+    --bg:#f3f4f9; --surface:#ffffff; --surface2:#eaecf5; --border:#d8dbec;
+    --accent:#6c58f0; --accent2:#2bb8af; --danger:#e84545;
+    --present:#2bb8af; --absent:#d8dbec; --text:#1a1c2e; --muted:#7a7f9a;
+    --grid:rgba(108,88,240,0.05); --hbg:rgba(243,244,249,0.92); --shadow:0 4px 16px rgba(108,88,240,0.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  #app{position:relative;z-index:1;}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:15px 32px;border-bottom:1px solid var(--border);background:var(--hbg);backdrop-filter:blur(14px);position:sticky;top:0;z-index:100;transition:background .3s,border-color .3s;}
+  .logo{font-size:1.5rem;font-weight:800;letter-spacing:-1px;line-height:1;}
+  .logo span{color:var(--accent);}
+  .logo-credit{font-size:0.58rem;color:var(--muted);font-weight:400;letter-spacing:0;display:block;margin-top:1px;}
+  .header-left{display:flex;align-items:center;gap:14px;}
+  .header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+
+  .theme-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .18s;color:var(--muted);}
+  .theme-btn:hover{border-color:var(--accent);transform:rotate(20deg);}
+
+  .btn{font-family:'Syne',sans-serif;font-weight:600;font-size:0.8rem;letter-spacing:.4px;padding:8px 15px;border-radius:8px;border:none;cursor:pointer;transition:all .18s;display:inline-flex;align-items:center;gap:6px;}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{filter:brightness(1.12);transform:translateY(-1px);}
+  .btn-success{background:var(--accent2);color:#0d0f14;}
+  .btn-success:hover{filter:brightness(1.1);transform:translateY(-1px);}
+  .btn-wa{background:#25D366;color:#fff;}
+  .btn-wa:hover{background:#1ebe5a;transform:translateY(-1px);}
+  .btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger);}
+  .btn-danger:hover{background:var(--danger);color:#fff;}
+
+  main{max-width:1100px;margin:0 auto;padding:30px 22px 70px;}
+
+  .site-credit{text-align:center;padding:16px;font-size:0.7rem;color:var(--muted);border-top:1px solid var(--border);margin-top:30px;letter-spacing:.4px;}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:20px;transition:background .3s,border-color .3s;}
+  .panel-title{font-size:0.67rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+
+  .session-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;}
+  .field label{display:block;font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+  .field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 13px;font-family:'Syne',sans-serif;font-size:0.88rem;color:var(--text);transition:border-color .2s,background .3s;outline:none;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
+  .field select option{background:var(--surface);}
+  .field textarea{resize:vertical;min-height:70px;font-size:0.83rem;}
+
+  /* Lecture dropdown */
+  .lec-wrap{position:relative;}
+  .lec-drop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;z-index:60;box-shadow:var(--shadow);display:none;overflow:hidden;}
+  .lec-drop.open{display:block;}
+  .lec-opt{padding:9px 14px;cursor:pointer;font-size:0.86rem;color:var(--text);transition:background .13s;display:flex;align-items:center;justify-content:space-between;}
+  .lec-opt:hover{background:var(--surface2);}
+  .lec-del{font-size:0.68rem;color:var(--muted);padding:2px 6px;border-radius:4px;}
+  .lec-del:hover{color:var(--danger);background:rgba(255,107,107,.1);}
+  .lec-add-row{padding:9px 12px;border-top:1px solid var(--border);display:flex;gap:7px;align-items:center;}
+  .lec-add-row input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-family:'Syne',sans-serif;font-size:0.8rem;color:var(--text);outline:none;}
+  .lec-add-row input:focus{border-color:var(--accent);}
+  .lec-empty{padding:9px 14px;font-size:0.8rem;color:var(--muted);font-style:italic;}
+
+  /* Stats */
+  .stats-bar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:20px;}
+  .stat{display:flex;flex-direction:column;gap:2px;}
+  .stat-val{font-size:1.75rem;font-weight:800;line-height:1;}
+  .stat-val.present{color:var(--present);} .stat-val.absent{color:var(--muted);} .stat-val.total{color:var(--text);}
+  .stat-label{font-size:0.67rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);}
+  .stat-div{width:1px;height:34px;background:var(--border);}
+  .prog-wrap{flex:1;min-width:170px;}
+  .prog-bg{height:6px;background:var(--border);border-radius:99px;overflow:hidden;}
+  .prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:width .4s cubic-bezier(.4,0,.2,1);width:0%;}
+  .prog-lbl{font-size:0.68rem;color:var(--muted);letter-spacing:1px;margin-top:5px;font-weight:600;}
+
+  /* Controls */
+  .controls{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}
+  .srch{position:relative;flex:1;min-width:170px;}
+  .srch input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 13px 9px 35px;font-family:'Syne',sans-serif;font-size:0.85rem;color:var(--text);outline:none;transition:border-color .2s;}
+  .srch input:focus{border-color:var(--accent);}
+  .srch-ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:0.88rem;pointer-events:none;}
+
+  /* Student grid */
+  .sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:11px;}
+  .sc{background:var(--surface2);border:1.5px solid var(--absent);border-radius:12px;padding:15px;cursor:pointer;transition:all .18s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden;user-select:none;}
+  .sc::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(78,205,196,.08),transparent);opacity:0;transition:opacity .2s;}
+  .sc:hover::before{opacity:1;}
+  .sc:hover{border-color:var(--accent2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(78,205,196,.12);}
+  .sc.present{border-color:var(--present);background:rgba(78,205,196,.07);}
+  .sc.present::before{opacity:1;}
+  .ctop{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;}
+  .av{width:34px;height:34px;border-radius:9px;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.95rem;font-weight:700;color:var(--muted);transition:all .2s;flex-shrink:0;}
+  .sc.present .av{background:rgba(78,205,196,.2);color:var(--accent2);}
+  .ck{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:transparent;transition:all .2s;flex-shrink:0;}
+  .sc.present .ck{background:var(--accent2);border-color:var(--accent2);color:#0d0f14;}
+  .sn{font-size:.85rem;font-weight:700;line-height:1.3;color:var(--text);word-break:break-word;}
+  .se{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);margin-top:3px;}
+  .sc.present .sn{color:var(--present);}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--muted);}
+  .empty .ico{font-size:3rem;margin-bottom:12px;}
+  .empty p{font-size:.87rem;line-height:1.6;}
+
+  /* Upload */
+  .uparea{border:2px dashed var(--border);border-radius:12px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;position:relative;}
+  .uparea:hover,.uparea.dov{border-color:var(--accent);background:rgba(124,106,247,.05);}
+  .uparea input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+
+  /* Modal */
+  .mo{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .mo.open{opacity:1;pointer-events:all;}
+  .md{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;width:90%;max-width:520px;transform:scale(.95) translateY(10px);transition:transform .2s,background .3s;max-height:90vh;overflow-y:auto;}
+  .mo.open .md{transform:scale(1) translateY(0);}
+  .md h2{font-size:1.22rem;font-weight:800;margin-bottom:5px;}
+  .md-sub{font-size:.8rem;color:var(--muted);margin-bottom:20px;}
+  .md-act{display:flex;gap:9px;margin-top:20px;justify-content:flex-end;flex-wrap:wrap;}
+
+  /* Toast */
+  .tw{position:fixed;bottom:26px;right:26px;z-index:300;display:flex;flex-direction:column;gap:8px;}
+  .toast{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 16px;font-size:.83rem;min-width:210px;transform:translateX(120%);transition:transform .3s cubic-bezier(.4,0,.2,1);border-left:3px solid var(--accent2);color:var(--text);}
+  .toast.show{transform:translateX(0);}
+  .toast.err{border-left-color:var(--danger);}
+
+  /* History */
+  .le{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);margin-bottom:7px;font-size:.83rem;flex-wrap:wrap;gap:8px;transition:background .3s;}
+  .lm{font-family:'DM Mono',monospace;color:var(--muted);font-size:.74rem;}
+  .badge{font-size:.67rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:99px;background:rgba(78,205,196,.15);color:var(--accent2);}
+
+  /* Tabs */
+  .tabs{display:flex;gap:4px;background:var(--surface2);border-radius:10px;padding:4px;margin-bottom:24px;width:fit-content;}
+  .tb{font-family:'Syne',sans-serif;font-size:.79rem;font-weight:600;letter-spacing:.5px;padding:8px 17px;border-radius:7px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all .18s;}
+  .tb.active{background:var(--accent);color:#fff;}
+  .tc{display:none;} .tc.active{display:block;}
+
+  /* Sample box */
+  .sb{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:13px;margin-top:13px;}
+  .sb pre{font-family:'DM Mono',monospace;font-size:.77rem;color:var(--accent2);white-space:pre-wrap;}
+
+  /* Class badge */
+  .cbadge{display:none;align-items:center;gap:8px;background:rgba(124,106,247,.1);border:1px solid rgba(124,106,247,.28);border-radius:8px;padding:5px 12px;cursor:pointer;transition:all .2s;}
+  .cbadge:hover{background:rgba(124,106,247,.18);}
+
+  @media(max-width:700px){
+    header{padding:13px 15px;}
+    main{padding:16px 11px 60px;}
+    .session-grid{grid-template-columns:1fr;}
+    .sg{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+    .ha-label{display:none;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+<header>
+  <div class="header-left">
+    <div class="logo">
+      L<span>o</span>gr
+      <span class="logo-credit">by Samyak &amp; Shivam</span>
+    </div>
+    <div class="cbadge" id="cbadge" onclick="openClassInfoModal()" title="Edit class info">
+      <span style="font-size:.72rem;color:var(--accent);font-weight:700" id="cbadge-txt">—</span>
+      <span style="font-size:.64rem;color:var(--muted)">✎</span>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀️</button>
+    <button class="btn btn-ghost" onclick="openClassInfoModal()">🏫 <span class="ha-label">Class Info</span></button>
+    <button class="btn btn-ghost" onclick="openModal('manage')">⚙ <span class="ha-label">Students</span></button>
+    <button class="btn btn-primary" onclick="openModal('add')">+ <span class="ha-label">Add</span></button>
+  </div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button class="tb active" onclick="swTab('attendance',this)">Attendance</button>
+    <button class="tb" onclick="swTab('history',this)">History</button>
+  </div>
+
+  <!-- ATTENDANCE TAB -->
+  <div class="tc active" id="tab-attendance">
+    <div class="panel">
+      <div class="panel-title">Session Details</div>
+      <div class="session-grid">
+        <div class="field">
+          <label>Lecture / Subject</label>
+          <div class="lec-wrap">
+            <input type="text" id="lec-name" placeholder="e.g. Data Structures – Lec 7" autocomplete="off"
+              oninput="filterLecDrop()" onfocus="openLecDrop()" onblur="setTimeout(closeLecDrop,200)">
+            <div class="lec-drop" id="lec-drop">
+              <div id="lec-list"></div>
+              <div class="lec-add-row">
+                <input type="text" id="lec-new" placeholder="New lecture name…" onkeydown="if(event.key==='Enter')addLec()">
+                <button class="btn btn-primary" style="padding:5px 10px;font-size:.76rem" onclick="addLec()">+ Add</button>
+                <button class="btn btn-ghost" style="padding:5px 10px;font-size:.76rem" onclick="addLecOther()">Other…</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="lec-date">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <button class="btn btn-success" onclick="submit('csv')">↓ CSV</button>
+          <button class="btn btn-primary" onclick="submit('pdf')">↓ PDF</button>
+          <button class="btn btn-wa" onclick="submit('wa')">📲 WhatsApp</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat"><span class="stat-val total" id="s-total">0</span><span class="stat-label">Total</span></div>
+      <div class="stat-div"></div>
+      <div class="stat"><span class="stat-val present" id="s-present">0</span><span class="stat-label">Present</span></div>
+      <div class="stat-div"></div>
+      <div class="stat"><span class="stat-val absent" id="s-absent">0</span><span class="stat-label">Absent</span></div>
+      <div class="stat-div"></div>
+      <div class="prog-wrap">
+        <div class="prog-bg"><div class="prog-fill" id="prog-fill"></div></div>
+        <div class="prog-lbl" id="prog-lbl">0% attendance</div>
+      </div>
+      <button class="btn btn-ghost" onclick="markAll(true)">✓ All</button>
+      <button class="btn btn-ghost" onclick="markAll(false)">✕ Clear</button>
+    </div>
+
+    <div class="controls">
+      <div class="srch">
+        <span class="srch-ico">⌕</span>
+        <input type="text" id="srch" placeholder="Search by name or enrollment…" oninput="renderS()">
+      </div>
+    </div>
+
+    <div class="sg" id="sgrid">
+      <div class="empty" style="grid-column:1/-1">
+        <div class="ico">🎓</div>
+        <p>No students yet.<br>Add students or upload a JSON file to get started.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div class="tc" id="tab-history">
+    <div class="panel">
+      <div class="panel-title">Saved Attendance Records</div>
+      <div id="hist-list">
+        <div class="empty"><div class="ico">📋</div><p>No records yet.</p></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="site-credit">Developed with ♥ by <strong>Samyak &amp; Shivam</strong> &nbsp;·&nbsp; Logr v2.0</div>
+</div>
+
+<div class="tw" id="tw"></div>
+
+<!-- CLASS INFO MODAL -->
+<div class="mo" id="modal-classinfo">
+  <div class="md">
+    <h2>Class Information</h2>
+    <p class="md-sub">Set once, saved permanently. Appears on every PDF report.</p>
+    <div class="field" style="margin-bottom:12px">
+      <label>Class Name</label>
+      <input type="text" id="ci-class" placeholder="e.g. AI-DS B">
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Semester</label>
+      <input type="text" id="ci-sem" placeholder="e.g. 4th Semester">
+    </div>
+    <div class="field">
+      <label>Teacher / Incharge (optional)</label>
+      <input type="text" id="ci-teacher" placeholder="e.g. Prof. Sharma">
+    </div>
+    <div style="margin-top:13px;padding:11px;background:rgba(124,106,247,.08);border-radius:8px;border:1px solid rgba(124,106,247,.2)">
+      <div style="font-size:.68rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;font-weight:700">Preview</div>
+      <div id="ci-prev" style="font-size:.9rem;font-weight:700;color:var(--accent)">—</div>
+    </div>
+    <div class="md-act">
+      <button class="btn btn-ghost" onclick="closeModal('classinfo')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCI()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD STUDENT MODAL -->
+<div class="mo" id="modal-add">
+  <div class="md">
+    <h2>Add Student</h2>
+    <p class="md-sub">Enter student details manually.</p>
+    <div class="field" style="margin-bottom:12px">
+      <label>Full Name</label>
+      <input type="text" id="add-name" placeholder="e.g. Arjun Sharma">
+    </div>
+    <div class="field">
+      <label>Enrollment Number</label>
+      <input type="text" id="add-enroll" placeholder="e.g. 2023CS001">
+    </div>
+    <div class="md-act">
+      <button class="btn btn-ghost" onclick="closeModal('add')">Cancel</button>
+      <button class="btn btn-primary" onclick="addStudent()">Add Student</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE MODAL -->
+<div class="mo" id="modal-manage">
+  <div class="md">
+    <h2>Manage Students</h2>
+    <p class="md-sub">Upload a JSON file or clear your roster.</p>
+    <div class="uparea" id="uparea">
+      <input type="file" accept=".json" id="json-up" onchange="handleJSON(event)">
+      <div style="font-size:1.8rem;margin-bottom:8px">📂</div>
+      <div style="font-size:.87rem;color:var(--muted);line-height:1.5"><strong style="color:var(--accent)">Click to upload</strong> or drag &amp; drop<br><span style="font-size:.75rem">(.json only)</span></div>
+    </div>
+    <div class="sb">
+      <div style="font-size:.7rem;color:var(--muted);margin-bottom:7px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Expected JSON Format</div>
+      <pre>[
+  { "name": "Arjun Sharma", "enrollment": "2023CS001" },
+  { "name": "Priya Patel",  "enrollment": "2023CS002" }
+]</pre>
+    </div>
+    <div class="md-act">
+      <button class="btn btn-danger" onclick="clearAll()">Clear All</button>
+      <button class="btn btn-ghost" onclick="closeModal('manage')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- WHATSAPP SHARE MODAL -->
+<div class="mo" id="modal-share">
+  <div class="md">
+    <h2>📲 Share on WhatsApp</h2>
+    <p class="md-sub">Tap "Open WhatsApp" to send — choose any contact.</p>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:14px;max-height:220px;overflow-y:auto">
+      <pre id="wa-prev" style="font-family:'DM Mono',monospace;font-size:.76rem;color:var(--text);white-space:pre-wrap;word-break:break-word"></pre>
+    </div>
+    <div class="md-act">
+      <button class="btn btn-ghost" onclick="closeModal('share')">Cancel</button>
+      <button class="btn btn-ghost" onclick="copyWA()">📋 Copy</button>
+      <button class="btn btn-wa" onclick="openWA()">Open WhatsApp →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// STATE
+let students = JSON.parse(localStorage.getItem('lg_students') || '[]');
+let att = {};
+let hist = JSON.parse(localStorage.getItem('lg_history') || '[]');
+let ci = JSON.parse(localStorage.getItem('lg_ci') || '{"className":"","semester":"","teacher":""}');
+let lecs = JSON.parse(localStorage.getItem('lg_lecs') || '[]');
+let waMsg = '';
+
+// THEME
+let theme = localStorage.getItem('lg_theme') || 'dark';
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('lg_theme', theme);
+  applyTheme();
+}
+applyTheme();
+
+// INIT
+document.getElementById('lec-date').valueAsDate = new Date();
+applyCI();
+renderS();
+renderHist();
+if (!ci.className && !ci.semester) setTimeout(() => openClassInfoModal(), 700);
+
+// CLASS INFO
+function applyCI() {
+  const b = document.getElementById('cbadge');
+  const t = document.getElementById('cbadge-txt');
+  if (ci.className || ci.semester) {
+    t.textContent = [ci.className, ci.semester].filter(Boolean).join(' · ');
+    b.style.display = 'flex';
+  } else { b.style.display = 'none'; }
+}
+function openClassInfoModal() {
+  document.getElementById('ci-class').value   = ci.className || '';
+  document.getElementById('ci-sem').value     = ci.semester  || '';
+  document.getElementById('ci-teacher').value = ci.teacher   || '';
+  updateCIPrev();
+  openModal('classinfo');
+}
+function updateCIPrev() {
+  const cn = document.getElementById('ci-class').value.trim();
+  const sem = document.getElementById('ci-sem').value.trim();
+  const tc = document.getElementById('ci-teacher').value.trim();
+  let p = [cn, sem].filter(Boolean).join(' · ') || '—';
+  if (tc) p += '  (' + tc + ')';
+  document.getElementById('ci-prev').textContent = p;
+}
+['ci-class','ci-sem','ci-teacher'].forEach(id => document.getElementById(id).addEventListener('input', updateCIPrev));
+function saveCI() {
+  ci = {
+    className: document.getElementById('ci-class').value.trim(),
+    semester:  document.getElementById('ci-sem').value.trim(),
+    teacher:   document.getElementById('ci-teacher').value.trim()
+  };
+  localStorage.setItem('lg_ci', JSON.stringify(ci));
+  applyCI(); closeModal('classinfo'); toast('✓ Class info saved.');
+}
+
+// LECTURE DROPDOWN
+function saveLecs() { localStorage.setItem('lg_lecs', JSON.stringify(lecs)); }
+function openLecDrop() { renderLecList(document.getElementById('lec-name').value); document.getElementById('lec-drop').classList.add('open'); }
+function closeLecDrop() { document.getElementById('lec-drop').classList.remove('open'); }
+function filterLecDrop() { renderLecList(document.getElementById('lec-name').value); }
+function renderLecList(q) {
+  q = (q||'').toLowerCase();
+  const fil = lecs.filter(l => l.toLowerCase().includes(q));
+  const el = document.getElementById('lec-list');
+  if (fil.length === 0) {
+    el.innerHTML = `<div class="lec-empty">${lecs.length === 0 ? 'No saved lectures yet — add one below.' : 'No match — add below.'}</div>`;
+    return;
+  }
+  el.innerHTML = fil.map(l => `<div class="lec-opt">
+    <span onclick="pickLec('${l.replace(/'/g,"\\'")}')" style="flex:1">📖 ${l}</span>
+    <span class="lec-del" onclick="delLec('${l.replace(/'/g,"\\'")}')">✕</span>
+  </div>`).join('');
+}
+function pickLec(n) { document.getElementById('lec-name').value = n; closeLecDrop(); }
+function delLec(n)  { lecs = lecs.filter(l => l !== n); saveLecs(); renderLecList(document.getElementById('lec-name').value); }
+function addLec() {
+  const v = document.getElementById('lec-new').value.trim();
+  if (!v) return;
+  if (!lecs.includes(v)) { lecs.push(v); saveLecs(); }
+  document.getElementById('lec-name').value = v;
+  document.getElementById('lec-new').value = '';
+  closeLecDrop();
+  toast('✓ "' + v + '" added to list.');
+}
+function addLecOther() {
+  const v = prompt('Enter custom lecture / subject name:');
+  if (v && v.trim()) {
+    const vt = v.trim();
+    if (!lecs.includes(vt)) { lecs.push(vt); saveLecs(); }
+    document.getElementById('lec-name').value = vt;
+    closeLecDrop();
+  }
+}
+
+// TABS
+function swTab(name, btn) {
+  document.querySelectorAll('.tc').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tb').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'history') renderHist();
+}
+
+// RENDER STUDENTS
+function renderS() {
+  const q = document.getElementById('srch').value.toLowerCase();
+  const grid = document.getElementById('sgrid');
+  const fil = students.filter(s => s.name.toLowerCase().includes(q) || s.enrollment.toLowerCase().includes(q));
+  if (fil.length === 0) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
+      <div class="ico">${students.length===0?'🎓':'🔍'}</div>
+      <p>${students.length===0?'No students yet.<br>Add students or upload a JSON file.':'No students match your search.'}</p>
+    </div>`;
+    updStats(); return;
+  }
+  grid.innerHTML = fil.map(s => {
+    const ip = !!att[s.enrollment];
+    const ini = s.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    return `<div class="sc ${ip?'present':''}" onclick="tog('${s.enrollment}')">
+      <div class="ctop"><div class="av">${ini}</div><div class="ck">${ip?'✓':''}</div></div>
+      <div class="sn">${s.name}</div>
+      <div class="se">${s.enrollment}</div>
+    </div>`;
+  }).join('');
+  updStats();
+}
+function updStats() {
+  const total = students.length;
+  const pres = Object.values(att).filter(Boolean).length;
+  const pct = total > 0 ? Math.round((pres/total)*100) : 0;
+  document.getElementById('s-total').textContent   = total;
+  document.getElementById('s-present').textContent = pres;
+  document.getElementById('s-absent').textContent  = total - pres;
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-lbl').textContent  = pct + '% attendance this session';
+}
+function tog(e) { att[e] = !att[e]; renderS(); }
+function markAll(v) { students.forEach(s => { att[s.enrollment] = v; }); renderS(); }
+
+// ADD STUDENT
+function addStudent() {
+  const name = document.getElementById('add-name').value.trim();
+  const enr  = document.getElementById('add-enroll').value.trim();
+  if (!name || !enr) { toast('Fill in both fields.', true); return; }
+  if (students.find(s => s.enrollment === enr)) { toast('Enrollment already exists.', true); return; }
+  students.push({ name, enrollment: enr });
+  saveStu();
+  document.getElementById('add-name').value = '';
+  document.getElementById('add-enroll').value = '';
+  closeModal('add'); renderS();
+  toast('✓ ' + name + ' added.');
+}
+
+// JSON UPLOAD
+function handleJSON(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data)) throw new Error('Expected an array.');
+      let added=0, skip=0;
+      data.forEach(item => {
+        const name = (item.name||item.Name||'').toString().trim();
+        const enr  = (item.enrollment||item.Enrollment||item.roll||item.Roll||'').toString().trim();
+        if (!name||!enr) { skip++; return; }
+        if (students.find(s=>s.enrollment===enr)) { skip++; return; }
+        students.push({ name, enrollment:enr }); added++;
+      });
+      saveStu(); renderS(); closeModal('manage');
+      toast('✓ Loaded ' + added + ' students' + (skip>0?', '+skip+' skipped':'') + '.');
+    } catch(err) { toast('Invalid JSON. '+err.message, true); }
+  };
+  r.readAsText(file); e.target.value = '';
+}
+
+// CLEAR
+function clearAll() {
+  if (!confirm('Remove all students and data?')) return;
+  students=[]; att={}; saveStu(); renderS(); closeModal('manage'); toast('All students cleared.');
+}
+
+// SUBMIT
+function submit(fmt='csv') {
+  const lec  = document.getElementById('lec-name').value.trim();
+  const date = document.getElementById('lec-date').value;
+  if (!lec)  { toast('Enter a lecture name.', true); return; }
+  if (!date) { toast('Select a date.', true); return; }
+  if (students.length === 0) { toast('No students in class.', true); return; }
+
+  const pres = students.filter(s =>  !!att[s.enrollment]);
+  const abs  = students.filter(s => !att[s.enrollment]);
+
+  const rec = {
+    id: Date.now(), lecture: lec, date,
+    total: students.length, presentCount: pres.length,
+    present: pres, absent: abs,
+    className: ci.className||'', semester: ci.semester||'', teacher: ci.teacher||''
+  };
+  hist.unshift(rec);
+  localStorage.setItem('lg_history', JSON.stringify(hist));
+
+  if (fmt==='pdf')     { genPDF(rec); toast('✓ Saved! '+pres.length+'/'+students.length+' present. PDF downloaded.'); }
+  else if (fmt==='wa') { buildWA(rec); }
+  else {
+    const rows = [
+      ['Lecture: '+lec,'',''],['Date: '+date,'',''],['','',''],
+      ['#','Name','Enrollment'],
+      ...pres.map((s,i)=>[i+1,s.name,s.enrollment]),
+      ['','',''],
+      ['Total Present: '+pres.length+' / '+students.length,'',Math.round((pres.length/students.length)*100)+'% attendance']
+    ];
+    dlFile(rows.map(r=>r.join(',')).join('\n'), 'attendance_'+lec.replace(/\s+/g,'_')+'_'+date+'.csv','text/csv');
+    toast('✓ Saved! '+pres.length+'/'+students.length+' present. CSV downloaded.');
+  }
+}
+
+// WHATSAPP
+function buildWA(r) {
+  const cl  = [r.className, r.semester].filter(Boolean).join(' | ');
+  const fd  = r.date ? new Date(r.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}) : r.date;
+  const pct = r.total>0 ? Math.round((r.presentCount/r.total)*100) : 0;
+  let m = '*Attendance — ' + r.lecture + '*\n';
+  if (cl) m += '📚 ' + cl + '\n';
+  m += '📅 ' + fd + '\n';
+  m += '━━━━━━━━━━━━━━━━\n';
+  m += '✅ *Present (' + r.presentCount + '/' + r.total + ')*\n';
+  r.present.forEach((s,i) => { m += (i+1)+'. '+s.name+'  _('+s.enrollment+')_\n'; });
+  m += '━━━━━━━━━━━━━━━━\n';
+  m += '📊 Attendance: *'+pct+'%*\n';
+  m += '\n_Logr · by Samyak & Shivam_';
+  waMsg = m;
+  document.getElementById('wa-prev').textContent = m;
+  openModal('share');
+}
+function openWA()  { window.open('https://wa.me/?text='+encodeURIComponent(waMsg), '_blank'); }
+function copyWA()  { navigator.clipboard.writeText(waMsg).then(()=>toast('✓ Copied!')).catch(()=>toast('Copy failed.',true)); }
+
+// PDF
+function genPDF(r) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const W=210, mg=18; let y=0;
+
+  // Header
+  doc.setFillColor(124,106,247);
+  doc.rect(0,0,W,36,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(20);
+  doc.text('Logr', mg, 14);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(210,205,255);
+  doc.text('Attendance Report — Present Students', mg, 22);
+  doc.setFontSize(7);
+  doc.setTextColor(175,165,240);
+  doc.text('by Samyak & Shivam', mg, 30);
+
+  if (r.className || r.semester) {
+    const cl = [r.className, r.semester].filter(Boolean).join(' · ');
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9);
+    doc.setTextColor(220,215,255);
+    doc.text(cl, W-mg, 14, {align:'right'});
+    if (r.teacher) {
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(185,180,240);
+      doc.text(r.teacher, W-mg, 22, {align:'right'});
+    }
+  }
+  y = 46;
+
+  // Info box
+  doc.setFillColor(245,245,252);
+  doc.roundedRect(mg, y, W-mg*2, 22, 3,3,'F');
+  doc.setTextColor(40,40,60);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(12);
+  doc.text(r.lecture, mg+5, y+8);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100,100,130);
+  const fd = r.date ? new Date(r.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}) : r.date;
+  doc.text('Date: '+fd, mg+5, y+16);
+  const pct = r.total>0 ? Math.round((r.presentCount/r.total)*100) : 0;
+  doc.text('Present: '+r.presentCount+' / '+r.total+'  ('+pct+'%)', W-mg-5, y+16, {align:'right'});
+  y += 30;
+
+  // Section label
+  doc.setTextColor(124,106,247);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(7.5);
+  doc.text('PRESENT STUDENTS', mg, y);
+  y += 5;
+
+  // Table header
+  const cx = [mg, mg+14, mg+104];
+  doc.setFillColor(30,32,40);
+  doc.rect(mg, y, W-mg*2, 8,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(7.5);
+  doc.text('#', cx[0]+2, y+5.5);
+  doc.text('Student Name', cx[1]+2, y+5.5);
+  doc.text('Enrollment No.', cx[2]+2, y+5.5);
+  y += 8;
+
+  if (r.present.length === 0) {
+    doc.setFillColor(255,248,248);
+    doc.rect(mg, y, W-mg*2, 10,'F');
+    doc.setTextColor(180,80,80);
+    doc.setFont('helvetica','italic');
+    doc.setFontSize(9);
+    doc.text('No students were marked present.', cx[0]+2, y+6.5);
+    y += 10;
+  } else {
+    r.present.forEach((s,i) => {
+      if (y > 268) { doc.addPage(); y=20; }
+      const ev = i%2===0;
+      doc.setFillColor(ev?250:245, ev?250:245, ev?255:252);
+      doc.rect(mg, y, W-mg*2, 9,'F');
+      doc.setTextColor(30,30,50);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(8.5);
+      doc.text(String(i+1), cx[0]+2, y+6);
+      doc.setFont('helvetica','normal');
+      doc.text(s.name, cx[1]+2, y+6);
+      doc.setTextColor(100,80,200);
+      doc.text(s.enrollment, cx[2]+2, y+6);
+      y += 9;
+    });
+  }
+
+  // Summary band
+  y += 6;
+  doc.setFillColor(78,205,196);
+  doc.rect(mg, y, W-mg*2, 10,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(8.5);
+  //doc.text('Total Present: '+r.presentCount, cx[0]+2, y+6.5);
+  doc.text('Absent: '+(r.total-r.presentCount), cx[1]+2, y+6.5);
+  doc.text('Attendance: '+pct+'%', cx[2]+2, y+6.5);
+
+  // Page footer
+  const pg = doc.internal.getNumberOfPages();
+  for (let p=1; p<=pg; p++) {
+    doc.setPage(p);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(175,175,200);
+    doc.text('Generated by Logr  ·  Developed by Samyak & Shivam  ·  Page '+p+' of '+pg, W/2, 292, {align:'center'});
+  }
+  doc.save('attendance_'+r.lecture.replace(/\s+/g,'_')+'_'+r.date+'.pdf');
+}
+
+// HISTORY
+function renderHist() {
+  const el = document.getElementById('hist-list');
+  if (hist.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="ico">📋</div><p>No records yet.</p></div>';
+    return;
+  }
+  el.innerHTML = hist.map(r => {
+    const cm = [r.className, r.semester].filter(Boolean).join(' · ');
+    return `<div class="le">
+      <div>
+        <div style="font-weight:700;font-size:.87rem">${r.lecture}</div>
+        <div class="lm">${r.date}${cm?' &nbsp;·&nbsp; '+cm:''} &nbsp;·&nbsp; ${r.total} students</div>
+      </div>
+      <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+        <span class="badge">${r.presentCount}/${r.total}</span>
+        <button class="btn btn-ghost" style="padding:5px 9px;font-size:.74rem" onclick="redl(${r.id},'csv')">↓ CSV</button>
+        <button class="btn btn-ghost" style="padding:5px 9px;font-size:.74rem;border-color:var(--accent);color:var(--accent)" onclick="redl(${r.id},'pdf')">↓ PDF</button>
+        <button class="btn btn-wa" style="padding:5px 9px;font-size:.74rem" onclick="redl(${r.id},'wa')">📲</button>
+        <button class="btn btn-danger" style="padding:5px 9px;font-size:.74rem" onclick="delRec(${r.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function redl(id, fmt) {
+  const r = hist.find(x=>x.id===id); if (!r) return;
+  if (fmt==='pdf') { genPDF(r); return; }
+  if (fmt==='wa')  { buildWA(r); return; }
+  const rows = [
+    ['Lecture: '+r.lecture,'',''],['Date: '+r.date,'',''],['','',''],
+    ['#','Name','Enrollment'],
+    ...r.present.map((s,i)=>[i+1,s.name,s.enrollment]),
+    ['','',''],
+    ['Total Present: '+r.presentCount+' / '+r.total,'',Math.round((r.presentCount/r.total)*100)+'% attendance']
+  ];
+  dlFile(rows.map(row=>row.join(',')).join('\n'), 'attendance_'+r.lecture.replace(/\s+/g,'_')+'_'+r.date+'.csv','text/csv');
+}
+function delRec(id) {
+  hist = hist.filter(x=>x.id!==id);
+  localStorage.setItem('lg_history', JSON.stringify(hist));
+  renderHist(); toast('Record deleted.');
+}
+
+// UTILS
+function dlFile(content, name, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type}));
+  a.download = name; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function saveStu() { localStorage.setItem('lg_students', JSON.stringify(students)); }
+
+// MODALS
+function openModal(n)  { document.getElementById('modal-'+n).classList.add('open'); }
+function closeModal(n) { document.getElementById('modal-'+n).classList.remove('open'); }
+document.querySelectorAll('.mo').forEach(el => {
+  el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); });
+});
+
+// TOAST
+function toast(msg, err=false) {
+  const w = document.getElementById('tw');
+  const el = document.createElement('div');
+  el.className = 'toast'+(err?' err':'');
+  el.textContent = msg;
+  w.appendChild(el);
+  setTimeout(()=>el.classList.add('show'),10);
+  setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),400);},3000);
+}
+
+// DRAG & DROP
+const ua = document.getElementById('uparea');
+ua.addEventListener('dragover', e=>{e.preventDefault();ua.classList.add('dov');});
+ua.addEventListener('dragleave',()=>ua.classList.remove('dov'));
+ua.addEventListener('drop', e=>{
+  e.preventDefault(); ua.classList.remove('dov');
+  const f = e.dataTransfer.files[0];
+  if (f&&f.name.endsWith('.json')) handleJSON({target:{files:[f],value:''}});
+  else toast('Please drop a .json file.', true);
+});
+</script>
+</body>
+</html>
